@@ -190,6 +190,8 @@ geom_bar(stat = "identity", position = position_fill())+
    labs(title = "Number of Films made per Genre",
        caption = "There were very few genres and films made in the early 1900s\n Many films by the 2000s are of mixed genres.")
 
+# use \n to text wrap to next line.
+
 ```
 ```{r}
 ggplot(df_new, aes(x="", y=n, fill=genre))+
@@ -201,4 +203,3 @@ geom_bar(stat = "identity", width=.5, position = "dodge")+
   xlab("")
 
 ```
-
