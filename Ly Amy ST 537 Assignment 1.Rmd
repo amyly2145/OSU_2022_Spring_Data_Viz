@@ -1,0 +1,204 @@
+---
+title: "ST 537 Assignment 1"
+author: "Amy Ly"
+date: "`r Sys.Date()`"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(dplyr)
+library(ggrepel)
+
+#install.packages("ggplot2movies")
+library(ggplot2movies)
+
+knitr::opts_chunk$set(warning = FALSE, message = FALSE)
+```
+
+# Data Wrangling
+
+```{r}
+movies <- na.omit(get(data(movies)))
+
+genre <- rep(NA, nrow(movies)) 
+#create an empty vector based on number of rows
+
+count <- rowSums(movies[, 18:24])
+genre[which(count > 1)] = "Mixed Genre"
+genre[which(count < 1)] = "None"
+genre[which(count == 1 & movies$Action == 1)] = "Action"
+genre[which(count == 1 & movies$Animation == 1)] = "Animation"
+genre[which(count == 1 & movies$Comedy == 1)] = "Comedy"
+genre[which(count == 1 & movies$Drama == 1)] = "Drama"
+genre[which(count == 1 & movies$Documentary == 1)] = "Documentary"
+genre[which(count == 1 & movies$Romance == 1)] = "Romance"
+genre[which(count == 1 & movies$Short == 1)] = "Short"
+movies$genre<-as.factor(genre)
+
+decade <- rep(NA, nrow(movies))
+decade[which(movies$year>=2000)]="2000s"
+decade[which(movies$year>=1990 & movies$year<2000)]="1990s"
+decade[which(movies$year>=1980 & movies$year<1990)]="1980s"
+decade[which(movies$year>=1970 & movies$year<1980)]="1970s"
+decade[which(movies$year>=1960 & movies$year<1970)]="1960s"
+decade[which(movies$year>=1950 & movies$year<1960)]="1950s"
+decade[which(movies$year>=1940 & movies$year<1950)]="1940s"
+decade[which(movies$year>=1930 & movies$year<1940)]="1930s"
+decade[which(movies$year>=1920 & movies$year<1930)]="1920s"
+decade[which(movies$year>=1910 & movies$year<1920)]="1910s"
+decade[which(movies$year>=1900 & movies$year<1910)]="1900s"
+movies$decade<-as.factor(decade)
+
+budget_mil <- rep(0, nrow(movies))
+movies$budget_mil<- movies$budget/1E6
+#short format units for movies
+
+df_80s <- movies %>% 
+  filter(movies$year>=1980 & movies$year<1990) 
+
+df_90s <- movies %>% 
+  filter(movies$year>=1990 & movies$year<2000) 
+
+df_00s <- movies %>% 
+  filter(movies$year>=2000) 
+  
+dec_80s <- table(df_80s$genre) 
+dec_90s <- table(df_90s$genre)
+dec_00s <- table(df_00s$genre)
+
+tab <- data.frame(rbind(dec_80s, dec_90s, dec_00s))
+
+tab$decade <- c("1980s", "1990s", "2000s")
+
+df_new <- movies %>% 
+  group_by(decade, genre) %>% tally()
+
+```
+
+
+# Plot 1 Experimentation
+
+Question 1: How has ratings changed over the decades? 
+
+```{r}
+#Audience votes vs Critic Ratings
+
+ggplot(data=movies, aes(x=year, y=rating, color=genre)) +
+  geom_point(aes(size=length)) + geom_smooth(se=F) + facet_grid(genre~decade) + ggtitle("Critics vs Audience Ratings over Time") + theme(strip.text.y.right = element_text(angle = 0))
+
+
+```
+```{r}
+ggplot(data=movies, aes(x=year, y=rating, color=genre)) + geom_smooth(se=F) + ggtitle("Critics vs Audience Ratings over Time") 
+```
+```{r}
+movies %>% 
+  filter(year >= 1950) %>% 
+ggplot(aes(x = rating, fill=genre)) +
+  facet_wrap(~decade)+
+  geom_boxplot() + 
+  coord_flip()+
+  labs(title = "Ratings of Genres over Decades",
+              subtitle = "1950s to 2000s",
+              caption = "The median ratings of most genres improved over the decades, though the spread and numbers of outliers increased as well.", 
+       y.axis = "", 
+       x.axis = "Rating") + 
+    theme(axis.text.x = element_blank(),
+        axis.ticks.x = element_blank())
+```
+
+# Plot 2:
+
+How does budget affect length of movies? (Which movies are the longest?)
+
+```{r}
+
+ggplot(data = movies, aes(x = genre, y=length, fill = genre)) + geom_bar(stat = "identity", position = 'dodge')+
+  facet_wrap(~decade, ncol=3)+ 
+  theme(axis.title.x=element_blank(),
+        axis.text.x=element_blank(),
+        axis.ticks.x=element_blank())+ 
+  labs(title = "Length of Genres over the Decades", y = "Length (min)")
+
+```
+
+```{r}
+
+#labeling a point based on conditions 
+
+movies %>% 
+  group_by(genre) %>% 
+  mutate(my_label = ifelse(length >= max(length),
+                           paste(as.character(title)), "")) %>% 
+  ggplot(aes(x = budget_mil, y = length, color = genre, label = my_label)) +
+  geom_violin() 
+```
+
+```{r}
+
+#labeling a point based on conditions 
+
+df_movies2 <- movies %>% 
+  group_by(genre) %>% 
+  mutate(my_label = ifelse(length >= max(length),
+                           paste(as.character(title)), "")) %>% 
+  mutate(alpha2=ifelse(length >= max(length), 1, 0.2))
+
+  ggplot(data = df_movies2, aes(x = budget_mil, 
+             y = length, 
+             label = my_label, color = genre)) + 
+  geom_point(aes(color = genre), alpha=df_movies2$alpha2) + 
+  geom_text(hjust = 0.15,vjust = 1, 
+            position = position_jitterdodge(jitter.width = 1, seed = 123)) +
+  labs(title = "Length of Films vs Budgets", 
+       x = "Budget (in millions of dollars)", 
+       y = "Length (min)",
+       caption = "The longest films for each genre are highlighted as solid colors.\n There seems to be a positive nonlinear relationship between budgets and lengths of films.")
+```
+
+# Plot 3
+
+What's been the most popular type of movies?
+
+
+```{r}
+ggplot(df_new, aes(x="", y=n, fill=genre))+ 
+geom_bar(stat = "identity", position = position_fill())+
+   geom_text(aes(x=1.6,label = n), position = position_fill(vjust = 0.5), size =2)+
+  facet_wrap(~decade, nrow = 3)+
+  theme(axis.text = element_blank(),
+        axis.ticks = element_blank(),
+        panel.grid  = element_blank()) +
+  xlab("")
+
+```
+
+```{r}
+ggplot(df_new, aes(x="", y=n, fill=genre))+ 
+geom_bar(stat = "identity", position = position_fill())+
+  geom_text(aes(x=1.6, label = n), position = position_fill(vjust = 0.5), size =2) +
+#x = 1.6 shoves the text outside of the pie chart boundaries 
+  coord_polar("y") +
+  facet_wrap(~decade, nrow = 3)+
+  theme(axis.text = element_blank(),
+        axis.ticks = element_blank(),
+        panel.grid  = element_blank(), 
+        axis.title.x = element_blank(), 
+        axis.title.y = element_blank()) +
+   labs(title = "Number of Films made per Genre",
+       caption = "There were very few genres and films made in the early 1900s\n Many films by the 2000s are of mixed genres.")
+
+```
+```{r}
+ggplot(df_new, aes(x="", y=n, fill=genre))+
+geom_bar(stat = "identity", width=.5, position = "dodge")+
+   geom_text(aes(label = n),
+            position = position_dodge(width = 0.5), vjust = -0.5, size = 2)+
+  # add blank geom to force facets on the same row to the same height
+  facet_wrap(~decade,nrow=3)+
+  xlab("")
+
+```
+
