@@ -1,0 +1,165 @@
+---
+title: "Assignment 3 Report"
+author: "Amy Ly"
+date: "5/15/2022"
+output:
+  word_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+```
+
+
+```{r, echo = FALSE, message = FALSE, results = FALSE, warning= FALSE}
+
+# Data Wrangling 
+
+pokemon <- read.csv("https://gist.githubusercontent.com/armgilles/194bcff35001e7eb53a2a8b441e8b2c6/raw/92200bc0a673d5ce2110aaad4544ed6c4010f687/pokemon.csv")
+
+pokemon <- pokemon %>%  
+ pivot_longer(cols = c(`Total`,`HP`, `Attack`, `Defense`, `Sp..Atk`, `Sp..Def`, `Speed`), 
+    names_to = "Stat", 
+    values_to = "Values") %>% 
+  mutate(Stat = recode(Stat, 
+                       "Sp..Atk" = "Sp.Atk",
+                       "Sp..Def" = "Sp.Def")) %>% 
+  filter(!(grepl('Mega|Primal', Name))) %>% 
+  mutate(across(c("Type.1", "Type.2"), na_if, "", .names = "{.col}_changed")) %>% 
+  rowwise() %>% 
+  mutate(Type = paste(sort(c(Type.1_changed, Type.2_changed)), collapse = ", ")) %>% 
+ pivot_longer(cols = c(`Type.1`,`Type.2`), 
+    names_to = "Type_Split", 
+    values_to = "Values2") %>% 
+  filter(Values2 != "") %>% 
+  select(Name, Generation, Stat, Values, Type, Type_Split, Values2) %>% 
+  rename(Type_Combo = Type,
+         Type = Values2) %>% 
+  # where 0 means there is only 1 type and 1 means there are 2 types.
+  mutate(Type_Split = recode(Type_Split, 
+                       "Type.1" = "0",
+                       "Type.2" = "1"),
+         Type = factor(Type, levels = c("Normal","Fire","Water",
+                          "Electric","Grass","Ice",
+                          "Fighting","Poison", "Ground",
+                          "Flying","Psychic","Bug",
+                          "Rock","Ghost","Dragon",
+                          "Dark","Steel","Fairy")))
+
+```
+
+
+## Introduction
+
+I haven't played Pokemon in a long time, not since Generation 3 came out. I was curious about how Pokemon stats have changed over time, especially as they added new Types and retyped previous generations of Pokemon. I looked on github for a fairly complete csv file. I wasn't quite sure what my research questions were at the time of searching, but I required the following data to be recorded:
+
+* Pokemon names
+* their types (primary and secondary)
+* Stat values (Total, HP, Attack, Defense, Sp.Atk, Sp.Def, Speed) 
+* Generation 
+
+Thanks to GILLES Armand on github (https://gist.github.com/armgilles/194bcff35001e7eb53a2a8b441e8b2c6), I found the perfect csv file to work with. It has 800 observations with all the variables of interest and some extra too. The file is 131 MB. 
+
+# Plot 1: Popularity of Pokemon Types over the Generations
+
+```{r, echo = FALSE, message = FALSE, results = FALSE, warning= FALSE}
+pokemon %>% 
+  group_by(Type, Generation) %>% 
+  summarize(Count = n()) %>% 
+  ggplot(aes(x=Generation, alpha=Count, color = Type, size = Count))+
+  geom_point(aes(y = Count)) + 
+  facet_wrap(~Type, ncol = 6)+
+  coord_cartesian(ylim=c(0,275), xlim=c(0.5,6.5))+
+      scale_color_manual(name="Types",
+        values=c(Normal = '#A8A77A',
+                        Fire = '#EE8130',
+                        Water = '#6390F0',
+                        Electric = '#F7D02C',
+                        Grass = '#7AC74C',
+                        Ice = '#96D9D6',
+                        Fighting = '#C22E28',
+                        Poison = '#A33EA1',
+                        Ground = '#E2BF65',
+                        Flying = '#A98FF3',
+                        Psychic = '#F95587',
+                        Bug = '#A6B91A',
+                        Rock = '#B6A136',
+                        Ghost = '#735797',
+                        Dragon = '#6F35FC',
+                        Dark = '#705746',
+                        Steel = '#B7B7CE',
+                        Fairy ='#D685AD'))+
+   guides(color=FALSE)+
+     labs(x = "Generation", 
+          y = "Number of Pokemon", 
+          title = "Popularity of Types Over Generations")+
+    scale_x_continuous(breaks=seq(1, 6, 1))+
+   scale_y_continuous(breaks=seq(0, 275, 50))
+   theme(axis.text.x = element_text(hjust=0), 
+         legend.key.size = unit(0.3, 'cm'), 
+         plot.margin=unit(c(0.1,0.1,0.1,0.1), 'cm'),
+        legend.justification="right",
+        legend.margin=margin(0.1,0.1,0.1,0.1),
+        legend.box.margin=margin(-3,-3,-3,-3))
+```
+Back when I played Pokemon, I remembered that Steel types didn't exist until Generation 2. Fairy types were also not introduced until Generation 6. The popularity of Water types definitely waned after Generation 1 and Generation 3. This makes sense because most of the region in Generation 3 was water-based and too many Water types were probably introduced. There was a drastic decrease in Poison types after Generation 1. Ice types never seemed to be particularly popular. They must either be rare or did not offer much advantage in Pokemon battles. 
+
+# Plot 2: Individual Stat Distributions by Types Over the Past 6 Generations
+
+```{r, echo = FALSE, message = FALSE, results = FALSE, warning= FALSE}
+ pokemon %>% 
+    filter(Stat != "Total" ) %>% 
+  ggplot(aes(y=Values, x=Type))+
+  geom_boxplot(aes(fill = Type))+
+  facet_wrap(~Stat)+
+     labs(x = "Type", 
+          y =  "Stat Values", 
+          title = "Distribution of Stats by Types")+
+  scale_fill_manual(name="Types",
+        values=c(Normal = '#A8A77A',
+                        Fire = '#EE8130',
+                        Water = '#6390F0',
+                        Electric = '#F7D02C',
+                        Grass = '#7AC74C',
+                        Ice = '#96D9D6',
+                        Fighting = '#C22E28',
+                        Poison = '#A33EA1',
+                        Ground = '#E2BF65',
+                        Flying = '#A98FF3',
+                        Psychic = '#F95587',
+                        Bug = '#A6B91A',
+                        Rock = '#B6A136',
+                        Ghost = '#735797',
+                        Dragon = '#6F35FC',
+                        Dark = '#705746',
+                        Steel = '#B7B7CE',
+                        Fairy ='#D685AD'))+
+   theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1), 
+         legend.key.size = unit(0.4, 'cm'), 
+         plot.margin=unit(c(0.1,0.1,0.1,0.1), 'cm'),
+        legend.justification="right",
+        legend.margin=margin(0.1,0.1,0.1,0.1),
+        legend.box.margin=margin(-2,-2,-2,-2))
+```
+Based on my prior Pokemon experiences, I had some expectations for which type dominated certain Stats. As expected, Rock and Steel types result in hardier Pokemon and so the Defense stat should be higher on average. Also, as expected, Electric types are speedier than most Pokemon, followed by Flying types. Dragon types have a pretty wide distribution of Sp.Atk, but the edge out most other types with Sp.Def. I expected Fire types to high Attack overall since most of the movesets for Fire types are physical. I did not expect that Dragon types would also have a pretty high Attack stat, and wonder if that may be due to them sharing similar moveset pools. Fairy types are the lowest in Attack stat, but they are at least comparable with all other Types with other Stats. Since Normal types do not have special moves, a high Sp.Atk would be wasted on these types and I can understand when they have the overall lowest Sp.Atk. 
+
+# Plot 3: Base Total Stats Over the Generation for Each Type
+
+```{r, echo = FALSE, message = FALSE, results = FALSE, warning= FALSE}
+pokemon %>% 
+  filter(Stat == "Total") %>% 
+  ggplot(aes(y=Values, x=Generation))+
+  geom_boxplot(aes(group=Generation))+
+  facet_wrap(~Type, ncol = 6)+
+     labs(x = "Generation", 
+        y = "Total Base Stat Value", 
+        title = "Distribution of Totals by Generation and Type")+
+  scale_x_continuous(breaks=seq(1, 6, 1))+
+   theme(axis.text.x = element_text(hjust=0))
+```
+
+The median Total base stat of Normal, Water, Grass, Poison, and Psychic types remain fairly consistent over the generations. By Generation 4, Dragon types experienced a surge in overall Total base stat. Stat balancing must have occurred though, since it was gradually lowered in later generations. Dark types were not official in Generation 1, and were sorely needed to balance out all of the Fairy types that cropped up in Generation 6. There seems to be issues balancing Ghost, Ice, and Fairy types. The overall distributions fluctuate over the Generations. 
+
+
