@@ -166,7 +166,7 @@ What's been the most popular type of movies?
 ```{r}
 ggplot(df_new, aes(x="", y=n, fill=genre))+ 
 geom_bar(stat = "identity", position = position_fill())+
-   geom_text(aes(label = n), position = position_fill(vjust = 0.5), size =2)+
+   geom_text(aes(x=1.6,label = n), position = position_fill(vjust = 0.5), size =2)+
   facet_wrap(~decade, nrow = 3)+
   theme(axis.text = element_blank(),
         axis.ticks = element_blank(),
@@ -178,7 +178,8 @@ geom_bar(stat = "identity", position = position_fill())+
 ```{r}
 ggplot(df_new, aes(x="", y=n, fill=genre))+ 
 geom_bar(stat = "identity", position = position_fill())+
-   geom_text(aes(x=1.6, label = n), position = position_fill(vjust = 0.5), size =2)+
+  geom_text(aes(x=1.6, label = n), position = position_fill(vjust = 0.5), size =2) +
+#x = 1.6 shoves the text outside of the pie chart boundaries 
   coord_polar("y") +
   facet_wrap(~decade, nrow = 3)+
   theme(axis.text = element_blank(),
@@ -188,6 +189,8 @@ geom_bar(stat = "identity", position = position_fill())+
         axis.title.y = element_blank()) +
    labs(title = "Number of Films made per Genre",
        caption = "There were very few genres and films made in the early 1900s\n Many films by the 2000s are of mixed genres.")
+
+# use \n to text wrap to next line.
 
 ```
 ```{r}
@@ -200,4 +203,3 @@ geom_bar(stat = "identity", width=.5, position = "dodge")+
   xlab("")
 
 ```
-
