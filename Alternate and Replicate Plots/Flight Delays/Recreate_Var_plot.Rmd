@@ -1,0 +1,74 @@
+---
+title: "Recreate Variability Plot"
+author: "Amy Ly"
+date: "5/14/2022"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(hflights)
+```
+
+## Recreate Plot
+
+```{r}
+
+hflights_df <- as_tibble(hflights)
+
+hflights_df <- mutate(hflights_df, 
+  DepHour = floor(DepTime/100),
+  DayOfWeek = factor(DayOfWeek, 
+    labels = c("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")),
+  Date = ISOdate(Year, Month, DayofMonth)
+)
+hou <- filter(hflights_df, Origin == "HOU")
+
+hou_mon <- filter(hou, DayOfWeek == "Mon")
+
+# over all mondays in 2011, avg delay of flights departing by hour
+hou_mon_avg <- hou_mon %>%
+  group_by(DepHour) %>%
+  summarise(avg_delay = mean(DepDelay))
+
+# initial plot
+ggplot(hou_mon_avg, aes(DepHour, avg_delay)) + 
+  geom_point() +
+  geom_line() + 
+  ylab("Average delay (mins)") +
+  xlab("Departure time") +
+  scale_x_continuous(breaks = seq(0, 24, 6),
+    labels = c("midnight", "6am", "noon", "6pm", "midnight")) +
+  theme_bw(18)
+ggsave("08-monday.png", width = 6, height = 4)
+
+# for each monday in 2011, avg delay of flights departing by hour
+hou_mon_day <- filter(hou, DayOfWeek == "Mon") %>%
+  group_by(Date, DepHour) %>%
+  summarise(avg_delay = mean(DepDelay))
+
+```
+
+Quantile plot
+
+```{r}
+
+# quantiles for delay by time
+hou_mon_q <- hou_mon %>% group_by(DepHour) %>%
+  summarise(n = n(),
+    q25 = quantile(DepDelay, probs = 0.25, na.rm = TRUE),
+    q50 = quantile(DepDelay, probs = 0.5, na.rm = TRUE),
+    q75 = quantile(DepDelay, probs = 0.75, na.rm = TRUE))
+
+ggplot(hou_mon_q, aes(x = DepHour, alpha=n))+
+  geom_point(aes(y = q25)) +
+  geom_point(aes(y=q50)) + 
+  geom_point(aes(y=q75)) +
+  ylab("Average delay (mins)") +
+  xlab("Departure time") +
+  scale_x_continuous(breaks = seq(0, 24, 6),
+    labels = c("midnight", "6am", "noon", "6pm", "midnight")) +
+  theme(legend.position = "none")
+```
+

@@ -1,0 +1,147 @@
+---
+title: "Exploring gganimate"
+author: "Amy Ly"
+date: "5/21/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(gganimate)
+library(tidyverse)
+library(gifski)
+```
+
+
+# Dataset and Wrangling
+
+```{r, echo = FALSE, message = FALSE, results = FALSE, warning= FALSE}
+
+# Data Wrangling 
+
+pokemon <- read.csv("https://gist.githubusercontent.com/armgilles/194bcff35001e7eb53a2a8b441e8b2c6/raw/92200bc0a673d5ce2110aaad4544ed6c4010f687/pokemon.csv")
+
+pokemon <- pokemon %>%  
+ pivot_longer(cols = c(`Total`,`HP`, `Attack`, `Defense`, `Sp..Atk`, `Sp..Def`, `Speed`), 
+    names_to = "Stat", 
+    values_to = "Values") %>% 
+  mutate(Stat = recode(Stat, 
+                       "Sp..Atk" = "Sp.Atk",
+                       "Sp..Def" = "Sp.Def")) %>% 
+  filter(!(grepl('Mega|Primal', Name))) %>% 
+  mutate(across(c("Type.1", "Type.2"), na_if, "", .names = "{.col}_changed")) %>% 
+  rowwise() %>% 
+  mutate(Type = paste(sort(c(Type.1_changed, Type.2_changed)), collapse = ", ")) %>% 
+ pivot_longer(cols = c(`Type.1`,`Type.2`), 
+    names_to = "Type_Split", 
+    values_to = "Values2") %>% 
+  filter(Values2 != "") %>% 
+  select(Name, Generation, Stat, Values, Type, Type_Split, Values2) %>% 
+  rename(Type_Combo = Type,
+         Type = Values2) %>% 
+  # where 0 means there is only 1 type and 1 means there are 2 types.
+  mutate(Type_Split = recode(Type_Split, 
+                       "Type.1" = "0",
+                       "Type.2" = "1"),
+         Type = factor(Type, levels = c("Normal","Fire","Water",
+                          "Electric","Grass","Ice",
+                          "Fighting","Poison", "Ground",
+                          "Flying","Psychic","Bug",
+                          "Rock","Ghost","Dragon",
+                          "Dark","Steel","Fairy")))
+
+```
+
+
+# The static version
+
+```{r, echo = FALSE, message = FALSE, results = FALSE, warning= FALSE}
+ pokemon %>% 
+  group_by(Type, Generation, Stat) %>% 
+  summarize(Count = n(), 
+            Avg_Tot = mean(Values)) %>% 
+  filter(Stat == "Total") %>% 
+  ggplot(aes(x=Avg_Tot, alpha=Count, color = Type, size = Count))+
+  geom_point(aes(y = Count)) + 
+  coord_cartesian(ylim=c(0,60))+
+      scale_color_manual(name="Types",
+        values=c(Normal = '#A8A77A',
+                        Fire = '#EE8130',
+                        Water = '#6390F0',
+                        Electric = '#F7D02C',
+                        Grass = '#7AC74C',
+                        Ice = '#96D9D6',
+                        Fighting = '#C22E28',
+                        Poison = '#A33EA1',
+                        Ground = '#E2BF65',
+                        Flying = '#A98FF3',
+                        Psychic = '#F95587',
+                        Bug = '#A6B91A',
+                        Rock = '#B6A136',
+                        Ghost = '#735797',
+                        Dragon = '#6F35FC',
+                        Dark = '#705746',
+                        Steel = '#B7B7CE',
+                        Fairy ='#D685AD'))+
+     labs(y = "Number of Pokemon", 
+          title = "Popularity of Types Over Generations")+
+    scale_x_continuous(breaks=seq(250, 650, 50))+
+   scale_y_continuous(breaks=seq(0, 40, 10))+
+   theme(axis.text.x = element_text(hjust=0), 
+         legend.key.size = unit(0.3, 'cm'), 
+         plot.margin=unit(c(0.1,0.1,0.1,0.1), 'cm'),
+        legend.justification="right",
+        legend.margin=margin(0.1,0.1,0.1,0.1),
+        legend.box.margin=margin(-3,-3,-3,-3), 
+        legend.direction = "vertical", 
+        legend.box = "horizontal")
+
+```
+
+Animated Version: 
+
+```{r, message = FALSE, warning=FALSE}
+p2 <- pokemon %>% 
+  group_by(Type, Generation, Stat) %>% 
+  summarize(Count = n(), 
+            Avg_Tot = mean(Values)) %>% 
+  filter(Stat == "Total") %>% 
+  ggplot(aes(x=Avg_Tot, color = Type, size = Count))+
+  geom_point(aes(y = Count)) + 
+  coord_cartesian(ylim=c(0,40))+
+      scale_color_manual(name="Types",
+        values=c(Normal = '#A8A77A',
+                        Fire = '#EE8130',
+                        Water = '#6390F0',
+                        Electric = '#F7D02C',
+                        Grass = '#7AC74C',
+                        Ice = '#96D9D6',
+                        Fighting = '#C22E28',
+                        Poison = '#A33EA1',
+                        Ground = '#E2BF65',
+                        Flying = '#A98FF3',
+                        Psychic = '#F95587',
+                        Bug = '#A6B91A',
+                        Rock = '#B6A136',
+                        Ghost = '#735797',
+                        Dragon = '#6F35FC',
+                        Dark = '#705746',
+                        Steel = '#B7B7CE',
+                        Fairy ='#D685AD'))+
+    scale_x_continuous(breaks=seq(250, 650, 50))+
+   scale_y_continuous(breaks=seq(0, 40, 10))+ 
+  theme(legend.direction = "vertical", 
+        legend.box = "horizontal")+
+       # Here comes the gganimate specific bits
+
+  labs(title = 'Now showing Generation {closest_state}', 
+       subtitle = 'Frame {frame} of {nframes}',
+       x = 'Average Total Stat Value', 
+       y = 'Count of Pokemon') +
+    transition_states(Generation,
+                    transition_length = 1,
+                    state_length = 1) +
+   ease_aes('cubic-in-out')
+   
+animate(p2,fps=10,renderer = gifski_renderer())
+```

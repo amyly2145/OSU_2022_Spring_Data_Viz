@@ -1,0 +1,83 @@
+---
+title: 'ST 537: Replicate a Plot'
+author: Amy Ly, Abraham Mendoza, Brandon Booth, Miles Moran
+output: pdf_document
+---
+
+```{r}
+#install.packages("lubridate")
+library(tidyverse)
+library(ggplot2)
+library(lubridate)
+```
+
+Option 3: Wildfires in California
+From: https://www.buzzfeednews.com/article/peteraldhous/california-wildfires-people-climate
+
+Get the data:
+```{r}
+wildfires <- readr::read_csv("https://raw.githubusercontent.com/BuzzFeedNews/2018-07-wildfire-trends/master/data/calfire_frap.csv") %>% 
+  mutate(plot_date = as.Date(format(alarm_date,"2017-%m-%d")))
+wildfires
+```
+
+## Replicated Plot:
+```{r}
+ggplot(wildfires, aes(x = plot_date, y = year_, size = shape_area)) +
+  geom_point(colour = "orange", alpha = 0.5) +
+  theme(
+    legend.position = "none",
+    panel.background = element_rect(fill = 'black', color = 'black'),
+    panel.grid.major.y = element_line(colour = "grey", size = .1),
+    panel.grid.minor.y = element_line(colour = "grey", size = .1),
+    panel.grid = element_blank(),
+    axis.line = element_blank(),
+    axis.title = element_blank(),
+    axis.text = element_text(face = "bold", color="white"),
+    plot.background = element_rect(fill = "black")
+    ) +
+    scale_size(range = c(.1,8)) +
+  
+    scale_x_date(date_breaks = "months", 
+               date_labels = "%b"
+               ) +
+    geom_hline(yintercept = seq(1950, 2017), 
+             color = "grey", 
+             size = 0.1) +
+    scale_y_reverse(name = NULL, 
+                  #order from largest to smallest
+                  limits = c(2017,1950), 
+                  breaks = c(2010,1990,1970,1950)
+                  )
+
+ggsave("wildfire_replicated_plot.png", width = 5, height = 5)
+```
+
+## Alternate Plot:
+```{r}
+library(tidyverse)
+wildfires <- readr::read_csv("https://raw.githubusercontent.com/BuzzFeedNews/2018-07-wildfire-trends/master/data/calfire_frap.csv") %>% 
+  mutate(plot_date = as.Date(format(alarm_date,"2017-%m-%d")), 
+         month = format(plot_date, "%b"), 
+         high_area= ifelse(shape_area >= quantile(shape_area, 0.5),
+                            shape_area, ""),
+         low_area= ifelse(shape_area <= quantile(shape_area, 0.5),
+                           shape_area, ""), 
+         intensity = ifelse(high_area > 0, 'Large area', 'Small area')) %>%  
+  # create a month, indicator variables for high and low fire areas 
+  filter_at(vars(plot_date), all_vars(!is.na(.))) 
+#removes the rows with no time data
+
+wildfires$month = factor(wildfires$month, levels=c("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"))
+#change the order of the months
+
+ggplot(data = wildfires, aes(x = year_, y = shape_area, color = intensity )) + geom_point()+
+  facet_wrap(~month, ncol=3)+
+  labs(title = "Wildfires in California over Time", 
+       x = "Year", y = "Area of Fire") +
+  theme(legend.title = element_text(size = 8), 
+        legend.text = element_text(size = 8))
+#decrease the legend font
+
+ggsave("wildfire_alternate_plot.png", width = 5, height = 5)
+```

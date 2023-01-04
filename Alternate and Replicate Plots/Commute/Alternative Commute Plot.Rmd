@@ -1,0 +1,63 @@
+---
+title: 'ST 537: Alternative Commute Plot'
+author: Amy Ly, Abraham Mendoza, Brandon Booth, Miles Moran, Connor Crane
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(ggplot2)
+```
+
+
+## Plot
+
+```{r}
+commute <- read_rds("http://data.cwick.co.nz/commute.rds")
+# a subset of "Western" states for class
+states <- c("or", "ak", "ca", "wa", "id", "nv")
+
+#rename facet plot titles so that I don't have to deal with wrapping text
+my_label <-as_labeller(
+     c(`Car, truck, or van` = "Car",
+       `Bus or trolley bus` = "Bus",
+       `Streetcar or trolley car` = "Streetcar", 
+       `Subway or elevated` = "Subway",
+       `Ferryboat` = "Ferry", 
+       `Taxicab` = "Taxi",
+       `Motorcycle` = "Motorbike",
+       `Bicycle` = "Bike",
+       `Walked` = "Walk", 
+       `Worked at home` = "At Home",
+       `Other method` = "Other",
+       `Railroad` = "Train"))
+
+commute_nw <- filter(commute, state %in% states)
+ggplot(commute_nw) +
+ geom_bar(aes(x = "", y = prop, fill = factor(state_name)), 
+    stat = "identity", width = 0.5, position = "dodge") + 
+  facet_wrap(~ transport_type, scales = "free", 
+             labeller = my_label) +
+ labs(title = "Transportations Types and the Proportion of People Who Takes Them",
+      subtitle = "NW States considered only",
+       caption = "Out of all the NW states, Oregon leads in the proportion of bicyclists.", 
+      y = "Proportion of People", 
+      x = "", 
+      fill = "State Name")
+```
+Justification: 
+
+The original plot did not employ the easiest of perceptual tasks. It relied a lot on the area of pie charts (to convey information about proportion) and colors (which conveyed information about what transportation type each slice was). These are some of the hardest perceptual tasks. 
+
+From exploratory visualizations, we knew that the scale of the proportions for people who commuted by car would cause all the bars of the other transportation type to be marginalized and too small to be useful for comparison. 
+
+Therefore, instead of faceting by state, we faceted by transportation types. The original graphic was trying to showcase that more people in Oregon commute by bicycle compared to (other nearby) states. 
+
+The proportions in each facet plot is colored by state for easy comparison. The y-axis varies based on the transportation type and this is okay because we want to compare the length of the bars (magnitude of proportion of states) and the position of the bar on a common scale (which state is being compared). The bars are also colored by states for redundancy. 
+
+Perceptual Principles on Alternative Plot: For each individual transportation type, the states are being compared on a common scale and length. Coloring is used to differentiate each individual state in different plots (facets) to easier comparison. 
+
+Perceptual Principles on Original Plot: The original plot consists of pie charts for each individual state and then the proportions for each type of transportation is separated by area and color. 
+
+Comparison: The original plot was not as effective at showing relative proportions. The new plot ensured to have bar charts where proportions are more clearly identifiable. The new plot also allows for better comparison of states and specific transportation types. One can now more easily see which states have a higher or smaller proportion for a particular transportation type. 

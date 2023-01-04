@@ -1,0 +1,163 @@
+---
+title: "Week 5 Lab"
+author: "Amy Ly"
+date: "4/24/2022"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, 
+                      error = TRUE, 
+                      warning = FALSE)
+library(tidyverse)
+```
+
+## Notes on Pivoting
+
+# Section 12.3.1
+
+* Real life data is pretty messy.
+
+```{r}
+table4a
+
+#pivot to longer table
+
+table4a %>% 
+  pivot_longer(c(`1999`, `2000`), names_to = "year", values_to = "cases")
+
+```
+Remember to use backticks (for variable values/names that exist) when working with tibbles!!
+
+If some name doesn't exist, then use " ". 
+```{r}
+#does all the renaming 
+table4b %>% 
+  pivot_longer(c(`1999`, `2000`), names_to = "year", values_to = "population")
+```
+
+Combining multiple tibbles
+```{r}
+tidy4a <- table4a %>% 
+  pivot_longer(c(`1999`, `2000`), names_to = "year", values_to = "cases")
+tidy4b <- table4b %>% 
+  pivot_longer(c(`1999`, `2000`), names_to = "year", values_to = "population")
+left_join(tidy4a, tidy4b)
+```
+* Note that pivot_longer() is good for reformating columns names into rows
+
+# Section 12.3.2
+
+* Note that pivot(wider) is good for when you have observations scattered across multiple rows. Then you can group them by column
+
+```{r}
+table2
+
+table2 %>%
+    pivot_wider(names_from = type, values_from = count)
+```
+# Section 12.3.3 Exercises
+
+1. Why are Why are pivot_longer() and pivot_wider() not perfectly symmetrical?
+
+pivot_longer() has a names_ptype argument, e.g. names_ptype = list(year = double()). What does it do?
+
+```{r}
+stocks <- tibble(
+  year   = c(2015, 2015, 2016, 2016),
+  half  = c(   1,    2,     1,    2),
+  return = c(1.88, 0.59, 0.92, 0.17)
+)
+
+stocks
+
+stocks %>% 
+  pivot_wider(names_from = year, values_from = return) %>% 
+  pivot_longer(`2015`:`2016`, names_to = "year", values_to = "return")
+
+stocks %>% 
+  pivot_wider(names_from = year, values_from = return)
+
+
+```
+Data was lost when we used pivot_wider() and then pivot_longer(). 
+
+Pivot_wider() create column names based on the values in rows, so there would only only 2 distinct values for year and half. 
+
+Then pivot_longer() stacks multiple instances of a value into a column. 
+
+Pivot_long() also changes the data type for the stacked columns. For example, year is a character type now. 
+
+To avoid this issue, one can use the argument names_ptype argument in pivot_longer() to ensure that numeric variables are not changed to character types.
+
+2. Why does this code fail? 
+
+The code fails because there were not backticks used for referencing values that are '1999' and '2000'. As a result, the code tries to select columns 1999 and 2000, which do not exist. 
+
+```{r}
+table4a %>% 
+  pivot_longer(c(`1999`, `2000`), names_to = "year", values_to = "cases")
+
+```
+
+3. What would happen if you widen this table? Why? How could you add a new column to uniquely identify each value?
+
+```{r}
+people <- tribble(
+  ~name,             ~names,  ~values,
+  #-----------------|--------|------
+  "Phillip Woods",   "age",       45,
+  "Phillip Woods",   "height",   186,
+  "Phillip Woods",   "age",       50,
+  "Jessica Cordero", "age",       37,
+  "Jessica Cordero", "height",   156
+)
+
+people
+
+pivot_wider(people, names_from="name", values_from = "values")
+
+pivot_wider(people, names_from="names", values_from = "values")
+```
+
+Just using pivot_wider() isn't helpful through name or names isn't helpful. There are very few observations associated with each. 
+
+To make the column wider, I could mutate a dummy column that codes for unique name and names.
+
+```{r}
+people2 <- people %>%
+  group_by(name, names) %>%
+  mutate(obs = row_number())
+
+pivot_wider(people2, names_from="names", values_from = "values")
+
+pivot_wider(people2, names_from="name", values_from = "values")
+```
+4. Tidy the simple tibble below. Do you need to make it wider or longer? What are the variables?
+
+```{r}
+preg <- tribble(
+  ~pregnant, ~male, ~female,
+  "yes",     NA,    10,
+  "no",      20,    12
+)
+```
+
+I need to make this table longer. I see that there are multiple responses for 2 columns. 
+
+```{r}
+preg_tidy <- preg %>%
+  pivot_longer(c(male, female), names_to = "sex", values_to = "count")
+preg_tidy
+
+#if I don't want any NA's
+preg_tidy <- preg %>%
+  pivot_longer(c(male, female), names_to = "sex", values_to = "count", values_drop_na = TRUE)
+preg_tidy
+```
+Now we have 3 different variables: 
+
+* Pregnancy status
+* Sex
+* Number of people who responded
+

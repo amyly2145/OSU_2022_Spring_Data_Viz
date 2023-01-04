@@ -1,0 +1,596 @@
+---
+title: "Assignment 3"
+author: "Amy Ly"
+date: "5/12/2022"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(gridExtra)
+```
+
+## Session 1 Date: 12May2022 (18:00-22:00)
+
+I'm going to double check my data structure and clean it up, if necessary
+
+```{r}
+pokemon <- read.csv("https://gist.githubusercontent.com/armgilles/194bcff35001e7eb53a2a8b441e8b2c6/raw/92200bc0a673d5ce2110aaad4544ed6c4010f687/pokemon.csv")
+```
+
+First, is there any missing data? I don't expect any, but it's better to know now then later. 
+
+```{r}
+summary(pokemon)
+```
+As expected, the Pokemon names, types, and indicator for whether they are a legendary or not are of the character class. I also don't see any counts of missing data in the form of NA's. So that's good!
+
+Looking at the dataset in the Environment pane, it looks like all the other variables are integers. Perfect, I don't need to do any class conversions. 
+
+This dataset only covers Pokemon up to the 6th generation, but it should still help me figure out if there are any trends in how they are balancing Pokemon stats over time. 
+
+I'm going to wrangle the data in a more boxplot friendly format for me to judge the overall distribution of the stats, by generation. I'm also going to rename Sp..Atk and Sp..Def because the extra period in between bothers me. 
+
+```{r}
+pokemon2<- pokemon %>% 
+ pivot_longer(cols = c(`Total`,`HP`, `Attack`, `Defense`, `Sp..Atk`, `Sp..Def`, `Speed`), 
+    names_to = "Stat", 
+    values_to = "Values") %>% 
+  mutate(Stat = recode(Stat, 
+                       "Sp..Atk" = "Sp.Atk",
+                       "Sp..Def" = "Sp.Def"))
+
+ggplot(data=pokemon2, aes(y=Values, x=Stat))+
+  geom_boxplot()+
+  facet_wrap(~Generation)+
+   labs(title = "Distribution of Stats by Generation", 
+         x = "Stat",
+       y = "Stat Values")+
+   theme(axis.text.x = element_text(angle = 75, hjust=1)) 
+
+```
+The boxplot would have been more informative, if it wasn't for the totals compressing all the other Stats. I realize that the Total Stat has a higher range of values, so I'm going to separate it out. I also realized that it may be better to treat Generation as a factor rather than as an integer after I had trouble trying to create boxplots for each generation's totals. 
+
+```{r}
+p1 <- pokemon2 %>% 
+  filter(Stat != "Total") %>% 
+  ggplot(aes(y=Values, x=Stat))+
+  geom_boxplot()+
+  facet_wrap(~Generation)+
+   labs(title = "Distribution of Stats by Generation", 
+         x = "Stat",
+       y = "Stat Values")+
+   theme(axis.text.x = element_text(angle = 75, hjust=1)) 
+
+p2 <- pokemon2 %>%
+  filter(Stat == "Total") %>% 
+  mutate(Generation = as.factor(Generation)) %>% 
+  ggplot(aes(y=Values, x=Generation))+
+  geom_boxplot()+
+   labs(x = "Generation", 
+        y = "")+
+   theme(axis.text.x = element_text(angle = 75, hjust=1)) 
+
+grid.arrange(arrangeGrob(p1, p2, ncol=2))
+```
+I don't see any real obvious patterns here and it seems like the spread of stat points after the first three generations are pretty similar. I definitely expected that there would be balancing problems when Pokemon started out. 
+
+I just realized now though that they probably changed the stat blocks of prior generations to be more in line with modern generations if old generation pokemon shows up in the newer games...
+
+## Session 2 Date: 13May2022 (9:30 - 11:00, 12:00 - 17:30)
+
+Maybe the stats are more unbalanced depending on the pokemon type?
+
+First I'll check out what kind of types there are...
+
+```{r}
+unique(pokemon2$Type.1)
+```
+
+18 different types are a little bit too much for me to just explored visually right now. I'm just going to scope out the basic types: Grass, Fire, Water, Normal
+
+
+```{r}
+
+p1 <- pokemon2 %>% 
+  filter(Stat != "Total") %>% 
+  subset(Type.1 %in% c("Grass", "Fire", "Water", "Normal")) %>% 
+  ggplot(aes(y=Values, x=Type.1))+
+  geom_boxplot()+
+  facet_wrap(~Stat)+
+   labs(title = "Distribution of Stats by Primary Type", 
+         x = "Stat",
+       y = "Stat Values")+
+   theme(axis.text.x = element_text(angle = 75, hjust=1)) 
+
+p2 <- pokemon2 %>%
+  filter(Stat == "Total") %>% 
+  subset(Type.1 %in% c("Grass", "Fire", "Water", "Normal")) %>% 
+  mutate(Generation = as.factor(Generation)) %>% 
+  group_by(Generation, Type.1) %>% 
+  ggplot(aes(y=Values, x=Type.1))+
+  geom_boxplot()+
+   labs(x = "Type", 
+        y = "")+
+   theme(axis.text.x = element_text(angle = 75, hjust=1)) 
+
+grid.arrange(arrangeGrob(p1, p2, ncol=2))
+```
+There seems to be a bit of promise by looking at stats after grouping them by type. Normal types seem to have lower Sp.Atk and a lot of high outliers. It seems like Fire types have a slightly higher median than the other types I am looking at. Normal and Water types seem to have the widest spread. 
+
+I think it might be worthwhile looking at all of the types when comparing the Stats. 18 is still a lot of variables to plot though.... 
+
+```{r}
+
+pokemon2 %>% 
+  filter(Stat != "Total") %>% 
+  ggplot(aes(y=Values, x=Type.1))+
+  geom_boxplot()+
+  facet_wrap(~Stat)+
+   labs(title = "Distribution of Stats by Primary Type", 
+         x = "Stat",
+       y = "Stat Values")+
+   theme(axis.text.x = element_text(angle = -65, hjust=0)) 
+
+```
+The graphs are busy, but I can still glean some info from them. 
+It looks like overall Attack for Dragon, Ground, and Psychic types are higher. 
+As expected, Rock and Steel types have higher defense. 
+There are some interesting high outliers for Ice types that may be worth investigating. 
+Dragon and Psychic types have higher Sp.Atk. 
+The only thing special about Sp.Def is that there's any interesting high outlier for Bug types. I wonder if it's the same Pokemon that is contributing to the outlier seen in Defense? 
+Fire types have very high speed and little spread in their distributions. 
+
+Some Pokemon have secondary types though, so I wonder what the spread looks like if I group by that? 
+
+```{r}
+
+pokemon2 %>% 
+  filter(Stat != "Total") %>% 
+  ggplot(aes(y=Values, x=Type.2))+
+  geom_boxplot()+
+  facet_wrap(~Stat)+
+   labs(title = "Distribution of Stats by Primary Type", 
+         x = "Stat",
+       y = "Stat Values")+
+   theme(axis.text.x = element_text(angle = -65, hjust=0)) 
+
+```
+In regards to Type.2, it's interesting how Bug types result in a lot of high outliers for many of the Stats (Defense, HP, Sp.Atk, Sp.Def)
+
+I consulted with my local Pokemon expert, Will, who brought up a question. What in Generation 1 has almost a total base stat of close to 800? 
+
+```{r}
+pokemon2 %>% 
+  filter(Values >= 700)
+```
+Will strongly disagree with the fact that Mega and Primal Evolutions don't count. They were technically developed for the Generation 6 pokemon game. Therefore, I am going to remove these pokemon from the data set. 
+
+
+```{r}
+pokemon3 <- pokemon2 %>% filter(!(grepl('Mega|Primal', Name)))
+```
+
+Ok, now let's see how the plots look now.
+```{r}
+p3 <- pokemon3 %>% 
+  filter(Stat != "Total") %>% 
+  ggplot(aes(y=Values, x=Stat))+
+  geom_boxplot()+
+  facet_wrap(~Generation)+
+   labs(title = "Distribution of Stats by Generation", 
+         x = "Stat",
+       y = "Stat Values")+
+   theme(axis.text.x = element_text(angle = 75, hjust=1)) 
+
+p4 <- pokemon3 %>%
+  filter(Stat == "Total") %>% 
+  mutate(Generation = as.factor(Generation)) %>% 
+  ggplot(aes(y=Values, x=Generation))+
+  geom_boxplot()+
+   labs(x = "Generation", 
+        y = "")+
+   theme(axis.text.x = element_text(angle = 75, hjust=1)) 
+
+grid.arrange(arrangeGrob(p3, p4, ncol=2))
+```
+
+Apparently, it is interesting to Will that Generation 4 sees a significant increase in Total stat. This somewhat backs the community's opinion that there was a "power creep" in Generation 4. However, there are also a lot of baby pokemon available in Generation 4, which results in a a lot of lower values. 
+
+I wonder if I should chart the trends as a line instead of a barplot. Per Will's suggestion, I am going to color code by Type.  
+
+```{r}
+pokemon3_col <- pokemon3 %>%
+  filter(Stat == "Total") %>% 
+  mutate(Color = recode(Type.1, 
+                        'Normal' = 'A8A77A',
+                        'Fire' = 'EE8130',
+                        'Water' = '6390F0',
+                        'Electric' = 'F7D02C',
+                        "Grass" = '7AC74C',
+                        'Ice' = '96D9D6',
+                        'Fighting' = 'C22E28',
+                        'Poison' = 'A33EA1',
+                        'Ground' = 'E2BF65',
+                        'Flying' = 'A98FF3',
+                        'Psychic' = 'F95587',
+                        'Bug' = 'A6B91A',
+                        'Rock' = 'B6A136',
+                        'Ghost' = '735797',
+                        'Dragon' = '6F35FC',
+                        'Dark' = '705746',
+                        'Steel' = 'B7B7CE',
+                        'Fairy' ='D685AD'))
+
+ggplot(pokemon3_col,aes(y=Values, x=Generation))+
+geom_smooth(aes(color = Type.1), se = FALSE, size=0.5)+
+labs(x = "Generation", 
+        y = "")+
+scale_color_manual(name="Types",
+        values=c(Normal = '#A8A77A',
+                        Fire = '#EE8130',
+                        Water = '#6390F0',
+                        Electric = '#F7D02C',
+                        Grass = '#7AC74C',
+                        Ice = '#96D9D6',
+                        Fighting = '#C22E28',
+                        Poison = '#A33EA1',
+                        Ground = '#E2BF65',
+                        Flying = '#A98FF3',
+                        Psychic = '#F95587',
+                        Bug = '#A6B91A',
+                        Rock = '#B6A136',
+                        Ghost = '#735797',
+                        Dragon = '#6F35FC',
+                        Dark = '#705746',
+                        Steel = '#B7B7CE',
+                        Fairy ='#D685AD'))
+   theme(axis.text.x = element_text(angle = 75, hjust=1)) 
+
+
+```
+There's an issue with the above trend lines though. It doesn't account for the Type.2 columns. 
+
+According to my local Pokemon expert, the ordering of the type does not matter. This means that I should try consider type combinations.... I took a look at the data structure and it seems like if the Pokemon has no secondary type, there is no value recorded for Type.2. So it's time to modify the dataframe again. 
+
+```{r}
+
+pokemon3 %>% 
+  mutate(across(c("Type.1", "Type.2"), na_if, "",
+                .names = "{.col}_changed")) %>% 
+  unite(Types, ends_with('_changed'), na.rm = TRUE, sep = ", ") %>% 
+  distinct(Types) %>% 
+  mutate(Types = recode(Types,
+                        "Ice, Rock" = "Rock, Ice", 
+                        ))
+
+```
+
+This gives me duplicates of type combos, which isn't what I need... I guess I'll just stick with always grouping by the two types to make sure I consider Type combinations. 
+
+```{r}
+pokemon4 <- pokemon3 %>% 
+  group_by(Type.1, Type.2)
+```
+
+Let's take a look at the stats for grass type combinations. 
+
+```{r}
+
+pokemon4 %>%
+  filter(Stat == "Total") %>% 
+  subset(Type.1 == "Grass" | Type.2 == "Grass") %>% 
+  mutate(Generation = as.factor(Generation)) %>% 
+  ggplot(aes(y=Values, x=Type.1))+
+  geom_boxplot()+
+   labs(x = "Type", 
+        y = "")+
+   theme(axis.text.x = element_text(angle = 75, hjust=1)) 
+
+pokemon4 %>% 
+  filter(Stat != "Total") %>% 
+  subset(Type.1 == "Grass" | Type.2 == "Grass") %>% 
+  ggplot(aes(y=Values, x=Type.1))+
+  geom_boxplot()+
+  facet_wrap(~Stat)+
+   labs(title = "Distribution of Stats for Grass Type Combos", 
+         x = "Stat",
+       y = "Stat Values")+
+   theme(axis.text.x = element_text(angle = 90)) 
+
+
+```
+
+Per my local Pokemon expert's opinion, I've missed a few combinations, such as Grass + Flying and Grass + Dark. 
+
+So I'm going to fix the dataframe and manually recode to avoid duplicate combinations. 
+
+Session 3: 14May2022 (19:00 - 21:15)
+
+I got some help from Charlotte on fixing my dataset!
+
+```{r}
+
+pokemon5 <- pokemon3 %>% 
+  mutate(across(c("Type.1", "Type.2"), na_if, "", .names = "{.col}_changed")) %>% 
+  rowwise() %>% 
+  mutate(Type = paste(sort(c(Type.1_changed, Type.2_changed)), collapse = ", "))
+
+unique(pokemon5$Type)
+
+
+```
+Now I don't have to worry about duplicates! I'm going to subset by type, since 131 different type combinations is still too much to look at on one graph...
+
+```{r}
+pokemon5 %>% 
+  filter((grepl('Grass', Type)), Stat != "Total") %>% 
+  ggplot(aes(y=Values, x=Stat))+
+  geom_boxplot()+
+  facet_wrap(~Type)+
+   labs(title = "Distribution of Stats for Grass Type Combos", 
+         x = "Stat",
+       y = "Stat Values")+
+   theme(axis.text.x = element_text(angle = 90)) 
+
+pokemon5 %>% 
+filter((grepl('Grass', Type)), Stat == "Total")  %>% 
+  ggplot(aes(y=Values, x=Type))+
+  geom_boxplot()+
+   labs(x = "Type", 
+        y = "")+
+   theme(axis.text.x = element_text(angle = 75, hjust=1)) 
+  
+```
+It's kind of crowded. But I think the grouped boxplots are the best way to deal with 2 categorical variables and 1 continuous variable type data. I tried to draw a line trend for the total values that changed over generation, but I don't think it worked out.... 
+
+```{r}
+
+pokemon5 %>% 
+filter((grepl('Grass', Type)), Stat == "Total")  %>% 
+ggplot(aes(y=Values, x=Generation))+
+geom_line(aes(color = Type), se = FALSE, size=0.5)+
+labs(x = "Generation", 
+        y = "")
+```
+I'm going to compare the pure types first for the report. It's probably the easiest comparison to make. 
+
+```{r}
+pokemon5 %>% 
+  filter(!(grepl(',', Type)), Stat != "Total") %>% 
+  ggplot(aes(y=Values, x=Stat))+
+  geom_boxplot()+
+  facet_wrap(~Type, ncol=6)+
+     labs(x = "Stat", 
+        y = "Value")+
+   theme(axis.text.x = element_text(angle = 75, hjust=1))
+
+pokemon5 %>% 
+  filter(!(grepl(',', Type)), Stat == "Total") %>% 
+  ggplot(aes(y=Values, x=Generation))+
+  geom_smooth()+
+  facet_wrap(~Type, ncol = 6)
+     labs(x = "Type", 
+        y = "Value")+
+   theme(axis.text.x = element_text(angle = 75, hjust=1)) 
+```
+There's only 1 pure flying type pokemon, so it makes sense why it's not on the plot. But there should be at least 2 pure steel types... I'm going to replot using different filters and groupings to see where the information was lost. 
+
+```{r}
+pokemon5 %>% 
+  filter(!(grepl(',', Type)), Stat == "Total") %>% 
+  ggplot(aes(y=Values, x=Generation))+
+  geom_point()+
+  facet_wrap(~Type, ncol = 6)
+     labs(x = "Type", 
+        y = "Value")+
+   theme(axis.text.x = element_text(angle = 75, hjust=1)) 
+     
+     
+pokemon5 %>% 
+  filter(!(grepl(',', Type)), Stat == "Total") %>% 
+  ggplot(aes(y=Values, x=Generation))+
+  geom_boxplot(aes(group=Generation))+
+  facet_wrap(~Type, ncol = 6)
+     labs(x = "Type", 
+        y = "Value", 
+        title = "Distribution of Totals by Generation and Type")+
+   theme(axis.text.x = element_text(angle = 75, hjust=1))
+```
+# Session 4: 15May2022 (11:30 - 13:00)
+
+Apparently, it's not useful to think of Pokemon type combinations.... and the visualizations look messy. Perhaps, it would be more interesting to tally up the different combinations and see which are popular? 
+
+```{r}
+pokemon5 %>% 
+  group_by(Type, Generation) %>% 
+  summarize(Count = n()) %>% 
+  filter((grepl('Water', Type))) %>% 
+  ggplot(aes(y=Count, x=Generation))+
+  geom_point()+
+  facet_wrap(~Type)+
+     labs(x = "Generation", y = "Count")+
+   theme(axis.text.x = element_text(angle = 75, hjust=1)) 
+     
+
+```
+I think for the report, I'm going to focus on:
+
+* Base stat totals for types
+* Count of each type per generation
+* Are there any individual stat that defines a certain type of pokemon? For example, do electric types overall have the greatest speed? 
+
+```{r}
+pokemon5 %>% 
+  filter((grepl('Water', Type.1)|grepl('Water', Type.2)), Stat != "Total" ) %>% 
+  ggplot(aes(y=Values, x=Stat))+
+  geom_boxplot()+
+  facet_wrap(~Generation)+
+     labs(x = "Stat", 
+          y = "Values", 
+          title = "Distribution of Stats by Generation for Water Types")+
+   theme(axis.text.x = element_text(angle = 75, hjust=1)) 
+```
+Water Pokemon seem to be all-rounders.
+
+Will expects electric and steel types to show more significant differents in an individual stat. 
+```{r}
+pokemon5 %>% 
+  filter((grepl('Steel', Type.1)|grepl('Steel', Type.2)), Stat != "Total" ) %>% 
+  ggplot(aes(y=Values, x=Stat))+
+  geom_boxplot()+
+  facet_wrap(~Generation)+
+     labs(x = "Stat", 
+          y = "Values", 
+          title = "Distribution of Stats by Generation for Steel Types")+
+   theme(axis.text.x = element_text(angle = 75, hjust=1)) 
+```
+For steel type, defense is high and and speed is very low, as expected. 
+
+```{r}
+pokemon5 %>% 
+  filter((grepl('Steel', Type.1)|grepl('Steel', Type.2)), Stat != "Total" ) %>% 
+  ggplot(aes(y=Values, x=Stat))+
+  geom_boxplot()+
+  facet_wrap(~Generation)+
+     labs(x = "Stat", 
+          y = "Values", 
+          title = "Distribution of Stats by Generation for Steel Types")+
+   theme(axis.text.x = element_text(angle = 75, hjust=1)) 
+```
+
+```{r}
+pokemon5 %>% 
+  filter((grepl('Electric', Type.1)|grepl('Electric', Type.2)), Stat != "Total" ) %>% 
+  ggplot(aes(y=Values, x=Stat))+
+  geom_boxplot()+
+  facet_wrap(~Generation)+
+     labs(x = "Stat", 
+          y = "Values", 
+          title = "Distribution of Stats by Generation for Steel Types")+
+   theme(axis.text.x = element_text(angle = 75, hjust=1)) 
+```
+Speed seems markedly high for Electric types. 
+
+I'm going to rework the data structure again so that if a pokemon has a certain type, it will be included in the data. 
+```{r}
+pokemon6 <- pokemon5 %>% 
+ pivot_longer(cols = c(`Type.1`,`Type.2`), 
+    names_to = "Type_Split", 
+    values_to = "Values2") %>% 
+  filter(Values2 != "") %>% 
+  select(Name, Generation, Stat, Values, Type, Type_Split, Values2) %>% 
+  rename(Type_Combo = Type,
+         Type = Values2) %>% 
+  # where 0 means there is only 1 type and 1 means there are 2 types.
+  mutate(Type_Split = recode(Type_Split, 
+                       "Type.1" = "0",
+                       "Type.2" = "1"),
+         Type = factor(Type, levels = c("Normal","Fire","Water",
+                          "Electric","Grass","Ice",
+                          "Fighting","Poison", "Ground",
+                          "Flying","Psychic","Bug",
+                          "Rock","Ghost","Dragon",
+                          "Dark","Steel","Fairy")))
+ 
+
+```
+
+Let's look at the individual stats distribution for all types now. Per Will's request, it is easier to look compare particular types of pokemon if I have them color coded by their type. This isn't going to be colorblind friendly, but it will jump out at people if I used the hex color codes that are officially used by Nintendo. 
+
+```{r}
+  pokemon6 %>% 
+    filter(Stat != "Total" ) %>% 
+  ggplot(aes(y=Values, x=Type))+
+  geom_boxplot(aes(fill = Type))+
+  facet_wrap(~Stat)+
+     labs(x = "Type", 
+          y =  "Stat Values", 
+          title = "Distribution of Stats by Types")+
+  scale_fill_manual(name="Types",
+        values=c(Normal = '#A8A77A',
+                        Fire = '#EE8130',
+                        Water = '#6390F0',
+                        Electric = '#F7D02C',
+                        Grass = '#7AC74C',
+                        Ice = '#96D9D6',
+                        Fighting = '#C22E28',
+                        Poison = '#A33EA1',
+                        Ground = '#E2BF65',
+                        Flying = '#A98FF3',
+                        Psychic = '#F95587',
+                        Bug = '#A6B91A',
+                        Rock = '#B6A136',
+                        Ghost = '#735797',
+                        Dragon = '#6F35FC',
+                        Dark = '#705746',
+                        Steel = '#B7B7CE',
+                        Fairy ='#D685AD'))+
+   theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1), 
+         legend.key.size = unit(0.4, 'cm'), 
+         plot.margin=unit(c(0.1,0.1,0.1,0.1), 'cm'),
+        legend.justification="right",
+        legend.margin=margin(0.1,0.1,0.1,0.1),
+        legend.box.margin=margin(-2,-2,-2,-2))
+```
+
+Let's see how popular each type is over generations. For redundancy, I'm going to tie the transparency and size of the points together. 
+
+```{r}
+pokemon6 %>% 
+  group_by(Type, Generation) %>% 
+  summarize(Count = n()) %>% 
+  ggplot(aes(x=Generation, alpha=Count, color = Type, size = Count))+
+  geom_point(aes(y = Count)) + 
+  facet_wrap(~Type, ncol = 6)+
+  coord_cartesian(ylim=c(0,275), xlim=c(0.5,6.5))+
+      scale_color_manual(name="Types",
+        values=c(Normal = '#A8A77A',
+                        Fire = '#EE8130',
+                        Water = '#6390F0',
+                        Electric = '#F7D02C',
+                        Grass = '#7AC74C',
+                        Ice = '#96D9D6',
+                        Fighting = '#C22E28',
+                        Poison = '#A33EA1',
+                        Ground = '#E2BF65',
+                        Flying = '#A98FF3',
+                        Psychic = '#F95587',
+                        Bug = '#A6B91A',
+                        Rock = '#B6A136',
+                        Ghost = '#735797',
+                        Dragon = '#6F35FC',
+                        Dark = '#705746',
+                        Steel = '#B7B7CE',
+                        Fairy ='#D685AD'))+
+   guides(color=FALSE)+
+     labs(x = "Generation", 
+          y = "Number of Pokemon", 
+          title = "Popularity of Types Over Generations")+
+    scale_x_continuous(breaks=seq(1, 6, 1))+
+   scale_y_continuous(breaks=seq(0, 275, 50))
+   theme(axis.text.x = element_text(hjust=0), 
+         legend.key.size = unit(0.3, 'cm'), 
+         plot.margin=unit(c(0.1,0.1,0.1,0.1), 'cm'),
+        legend.justification="right",
+        legend.margin=margin(0.1,0.1,0.1,0.1),
+        legend.box.margin=margin(-3,-3,-3,-3))
+```
+One last experimentation. Instead of pure types, what happens if I aggregate by the type? I think this makese more sense to report since the subset of just pure types is much smaller.  
+```{r}
+pokemon6 %>% 
+  filter(Stat == "Total") %>% 
+  ggplot(aes(y=Values, x=Generation))+
+  geom_boxplot(aes(group=Generation))+
+  facet_wrap(~Type, ncol = 6)
+     labs(x = "Type", 
+        y = "Value", 
+        title = "Distribution of Totals by Generation and Type")+
+   theme(axis.text.x = element_text(angle = 75, hjust=1))
+```
+
+Report Session 1: 15May2022 (14:15 - 15:45)
+
+Now that I have my plots, I'm going to start working on my report (and any additional polishing the plots may need)!
+

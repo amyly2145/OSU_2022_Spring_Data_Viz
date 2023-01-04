@@ -1,0 +1,268 @@
+---
+title: "Alt Delay Plot"
+author: "Amy Ly, Miles Moran, Abraham Mendoza, Brandon Booth, Connor Crane"
+date: "4/24/2022"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, 
+                      warning = FALSE, cache = FALSE,
+                      fig.align = "center")
+
+library(tidyverse)
+library(lubridate)
+library(colorspace)
+library(hflights)
+```
+
+## Final Result:
+
+```{r, echo=FALSE, out.width="100%"}
+  knitr::include_graphics("Result_Final.png")
+```
+
+\newpage
+
+
+<!-- ## Data Wrangling -->
+
+```{r, eval=FALSE, echo=FALSE}
+
+hflights_df <- tbl_df(hflights)
+
+hflights_df <-mutate(hflights_df, 
+  DepHour = floor(DepTime/100),
+  DayOfWeek = factor(DayOfWeek, 
+    labels = c("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"))) %>% filter(complete.cases(.))
+
+day_hour <- group_by(hflights_df, Origin, DepHour, DayOfWeek, DayofMonth, DepDelay, Month)
+day_hour_sum <- summarise(day_hour, 
+  avg_delay = mean(DepDelay, na.rm = TRUE),
+  avg_delay_delayed = mean(DepDelay[DepDelay > 0], na.rm = TRUE),
+  prop_early = mean(DepDelay <= 0, na.rm = TRUE),
+  prop_15 = mean(DepDelay < 0 & DepDelay < 15, na.rm = TRUE),
+  prop_30 = mean(DepDelay >= 15 & DepDelay < 30, na.rm = TRUE),
+  prop_60 = mean(DepDelay >= 30 & DepDelay < 60, na.rm = TRUE),
+  prop_2h = mean(DepDelay >= 60 & DepDelay < 120, na.rm = TRUE),
+  prop_late = mean(DepDelay >= 60 & DepDelay < 120, na.rm = TRUE),
+  nflights  = n(),
+  ndests = n_distinct(Dest))
+
+delay_cat <- rep(NA, nrow(day_hour_sum))
+delay_cat[which(day_hour_sum$DepDelay<= 0)]="Early or On Time"
+delay_cat[which(day_hour_sum$DepDelay>0 & day_hour_sum$DepDelay<15)]="15 min late"
+delay_cat[which(day_hour_sum$DepDelay>=15 & day_hour_sum$DepDelay<30)]="30 min late"
+delay_cat[which(day_hour_sum$DepDelay>=30 & day_hour_sum$DepDelay<60)]="60 min late"
+delay_cat[which(day_hour_sum$DepDelay>=60 & day_hour_sum$DepDelay<120)]="120 min late"
+delay_cat[which(day_hour_sum$DepDelay>=120)]="Over 120 min late"
+day_hour_sum$delay_cat<-as.factor(delay_cat)
+
+season <- rep(NA, nrow(day_hour_sum))
+season[which(day_hour_sum$Month>=1 & day_hour_sum$Month <4)]="Spring"
+season[which(day_hour_sum$Month >= 4 & day_hour_sum$Month< 7)]="Summer"
+season[which(day_hour_sum$Month>= 7 & day_hour_sum$Month<10)]="Fall"
+season[which(day_hour_sum$Month>=10 & day_hour_sum$Month<13)]="Winter"
+day_hour_sum$season<-as.factor(season)
+
+
+prop <- rep(NA, nrow(day_hour_sum))
+prop[day_hour_sum$delay_cat == "Early or On Time"] = mean(day_hour_sum$prop_early)
+prop[day_hour_sum$delay_cat == "15 min late"] = mean(day_hour_sum$prop_15)
+prop[day_hour_sum$delay_cat == "30 min late"] = mean(day_hour_sum$prop_30)
+prop[day_hour_sum$delay_cat == "60 min late"] = mean(day_hour_sum$prop_60)
+prop[day_hour_sum$delay_cat == "120 min late"] = mean(day_hour_sum$prop_2h)
+prop[day_hour_sum$delay_cat == "Over 120 min late"] = mean(day_hour_sum$prop_late)
+day_hour_sum$prop <- prop
+
+day_hour_sum$DayOfWeek <- factor(day_hour_sum$DayOfWeek, 
+  levels = c("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"))
+
+day_hour_sum$delay_cat <- factor(day_hour_sum$delay_cat, 
+  levels = c("Early or On Time", 
+             "15 min late", 
+             "30 min late", 
+             "60 min late", 
+             "120 min late",
+             "Over 120 min late"))
+
+day_hour_sum %>% 
+  group_by(DayOfWeek, Origin, delay_cat) %>%
+  summarise(n = n()) %>%
+  mutate(freq = n / sum(n)) %>% 
+  ungroup()
+
+hcl_palettes(plot = TRUE)
+
+```
+
+<!-- ## V.4 Heat Map Facet by Season (Day of Week) -->
+
+```{r, eval=FALSE, echo=FALSE}
+
+ggplot(day_hour_sum, aes(DayOfWeek, DepHour)) +
+  geom_tile(aes(fill = delay_cat), colour = "grey50", width = 1)  +
+   scale_y_continuous("Departure Time", 
+    breaks = c(0, 3, 6, 9, 12,15, 18,21, 24),
+    labels = c("midnight","3am", "6am", "9am", "noon", "3pm", "6pm", "9pm", "midnight"),
+    expand = c(0, 0)) +
+    scale_x_discrete("Departure Day", expand=c(0,0))+
+  facet_wrap(.~season)+
+  scale_fill_discrete_sequential(
+    name = "Length of Delay", 
+     palette = "Heat 2", 
+    guide = "legend") + 
+  labs(title = "Avoid Flights around the Winter Holiday Seasons",
+       subtitle = "Earlier Flights are Also Better!",
+    tag = "Based on all \n departing flights from \n  George Bush \n Intercontinental Airport \n (IAH) and  William \n P. Hobby Airport \n (HOU) in 2011") +
+  theme(axis.ticks.x = element_blank(), 
+        panel.background = element_blank(), 
+        panel.grid.major = element_blank(), 
+        panel.grid.minor = element_blank(),
+        axis.line.y = element_line(color="black", size = 0.5),
+        axis.text.x = element_text(angle = 90, 
+                                   vjust = 0.5, hjust=1),
+        plot.tag.position = c(0.8, 0.18),  #position is from 0 to 1, c(x,y)
+        plot.tag = element_text(hjust = 0, size = 9),
+        legend.title = element_text(size = 8), 
+               legend.text = element_text(size = 8), 
+        plot.title = element_text(hjust = 0.5), 
+        plot.subtitle = element_text(hjust = 0.5),
+        ) + guides(color = "none")
+
+```
+
+<!-- ## V.5 Heat Map Facet by Season (Day of Month) -->
+
+```{r, eval=FALSE, echo=FALSE}
+
+#plotting with Days of Month on the x-axis 
+
+ggplot(day_hour_sum, aes(DayofMonth, DepHour)) +
+  geom_tile(aes(fill = delay_cat), colour = "grey50", width = 1)  +
+   scale_y_continuous("Departure Time", 
+    breaks = c(0, 3, 6, 9, 12,15, 18,21, 24),
+    labels = c("midnight","3am", "6am", "9am", "noon", "3pm", "6pm", "9pm", "midnight"),
+    expand = c(0, 0))+
+  facet_wrap(.~season)+
+  scale_fill_discrete_sequential(
+    name = "Length of Delay", 
+     palette = "Heat 2", 
+    guide = "legend") + 
+  labs(title = "Winter Flights Impacted by Dealsy",
+       tag = "Based on all \n departing flights from \n  George Bush \n Intercontinental Airport \n (IAH) and  William \n P. Hobby Airport \n (HOU) in 2011") +theme(panel.background = element_blank(), 
+        panel.grid.major = element_blank(), 
+        panel.grid.minor = element_blank(),
+        axis.line.y = element_line(color="black", size = 0.5),
+        axis.line.x = element_line(color="black", size = 0.5),
+        legend.title = element_text(size = 8), 
+               legend.text = element_text(size = 8), 
+        plot.title = element_text(hjust = 0.5), 
+        plot.subtitle = element_text(hjust = 0.5),
+        plot.tag.position = c(0.8, 0.15),  #position is from 0 to 1, c(x,y)
+        plot.tag = element_text(hjust = 0, size = 9))
+```
+
+## Code: (V.6) Heat Map Facet by Proximity to Holidays (within 3 days vs not)
+
+**Note:** code has been set to `eval=FALSE` in case you want to run it yourself! Additionally, we've split it across 3 pages by task / goal of the chunk.
+
+```{r, eval=FALSE}
+
+DepTimeToHour <- function(DepTime, DepDelay) {
+  DepTime[DepTime<DepDelay] <- DepTime[DepTime<DepDelay] + 2400
+  return( trunc((DepTime-DepDelay)/100) )
+}
+
+hflights <- hflights::hflights
+
+################################################################################
+### 1. Filter out NAs                                                        ###
+### 2. Combine Year/Month/DayofMonth variables into a single "Date" variable ###
+### 3. Turn the DayOfWeek variable into a nice factor                        ###
+### 4. Calculate the hour in which each departure was *supposed* to leave    ###
+################################################################################
+
+DayOfWeek.lbls <- c("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
+
+hflights_df <-
+    hflights                                                  %>%  
+    drop_na(Year, Month, DayofMonth, DayOfWeek, DepTime)      %>% 
+    as_tibble()                                               %>%
+    unite("date", c(Year, Month, DayofMonth), remove = FALSE) %>%
+    mutate(date = ymd(date, tz="US/Central"),
+           DayOfWeek = factor(DayOfWeek, labels = DayOfWeek.lbls),
+           DepHourOg = DepTimeToHour(DepTime, DepDelay)
+           ) 
+```
+
+\newpage
+
+```{r, eval=FALSE}
+################################################################################
+### Add a new variable for those close to holidays #############################
+################################################################################
+
+July4th <- ymd("2011-07-04", tz="US/Central")
+EasterD <- ymd("2011-04-24", tz="US/Central")
+ThnksGv <- ymd("2011-11-24", tz="US/Central")
+XmasDay <- ymd("2011-12-25", tz="US/Central")
+NYD2011 <- ymd("2011-01-01", tz="US/Central")
+NYD2012 <- ymd("2012-01-01", tz="US/Central")
+
+hflights_df <- 
+    hflights_df %>%
+    mutate(close_to_holiday = 
+                (abs(difftime(date, July4th, units="days")) <= 3) | 
+                (abs(difftime(date, EasterD, units="days")) <= 3) | 
+                (abs(difftime(date, ThnksGv, units="days")) <= 3) | 
+                (abs(difftime(date, XmasDay, units="days")) <= 3) | 
+                (abs(difftime(date, NYD2011, units="days")) <= 3) | 
+                (abs(difftime(date, NYD2012, units="days")) <= 3),
+           close_to_holiday = factor(close_to_holiday,
+                                     labels = c("Not Within 3 Days of Major Holiday",
+                                                "Within 3 Days of Major Holiday")))
+
+```
+
+\newpage
+
+```{r, eval=FALSE}
+################################################################################
+### Calculate the Mean DepDelay for each Hour in each Day of the Week ##########
+################################################################################
+
+hour_labs <- c("midnight","3am", "6am", "9am", "noon", "3pm", "6pm", "9pm", "midnight")
+facet_labs <- c("Normal Days", "Within 3 Days of a Major Holiday")
+delay_intervals <- c(0,15,30,60,120,240,999)
+
+
+hflights_df_summary <- 
+    hflights_df                                       %>%
+    filter(DepDelay > 0)                              %>%
+    group_by(close_to_holiday, DayOfWeek, DepHourOg)  %>%
+    summarize(meanDDelay = mean(DepDelay),
+              meanDDelay_binned = cut(meanDDelay, breaks=delay_intervals)
+              )                                       %>%
+    ungroup()
+
+
+ggplot(hflights_df_summary) + 
+    geom_tile(aes(DayOfWeek, DepHourOg, fill = meanDDelay_binned), 
+              colour = "black", 
+              width = 1) +
+    facet_wrap(.~close_to_holiday) + 
+    ggtitle("How Much Worse are Flight Delays Around Major Holidays?",
+            subtitle = "Average Flight Delay Time (Minutes), Near vs Far from Several Major Holidays \n (\"Major Holidays\" include NYD, Easter, 4th of July, Thanksgiving, Christmas)") + 
+    scale_y_continuous("Original (Scheduled) Departure Time",
+                       breaks = seq(0, 24, 3),
+                       labels = hour_labs,
+                       expand = c(0, 0)
+                       ) +
+    scale_x_discrete("Departure Day", expand=c(0,0)) +
+    scale_fill_discrete_sequential(name="Mean Length of \n Delay (Minutes)",
+                                   palette = "Inferno",
+                                   guide = "legend"
+                                   )
+```
+

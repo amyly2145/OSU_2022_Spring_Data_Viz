@@ -1,0 +1,233 @@
+---
+title: "Chapter 3 Exercises"
+author: "Amy Ly"
+date: "`r Sys.Date()`"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+#load the tidyverse package
+```
+
+
+## Section 3.2:
+
+Question: Do cars with big engines use more fuel than cars with small engines? 
+
+Exploratory data analysis: 
+
+What is the relationship between engine size and fuel efficiency? 
+
+```{r}
+mpg <- get(data(mpg))
+
+head(mpg)
+ggplot(data = mpg) + 
+  geom_point(mapping = aes(x = displ, y = hwy))
+
+```
+
+From the plot, one can see that, on average, that fuel efficiency decreases as engine size increases. 
+
+```{r}
+#Alternatively, can also create a ggplot using the following method
+
+ggplot(data = mpg, mapping = (aes(x=displ, y= hwy))) + 
+  geom_point() + labs(title = "Fuel Efficiency vs Engine Size", x = "Engine Size", y = "Fuel Efficiency")
+```
+
+
+# 3.2.4 Exercises
+
+$\underline{\text{Problem 1}}$: 
+
+```{r}
+ggplot(data=mpg)
+```
+
+When I run the above code chunk, I see an empty graph environment. 
+
+$\underline{\text{Problem 2}}$: 
+
+```{r}
+dim(mpg)
+
+```
+There are 234 rows and 11 columns in the mpg data set.
+
+$\underline{\text{Problem 3}}$: 
+
+Looking at the help page for the mpg dataset, the drv variable describes the type of drive train. 
+
+f = front-wheel drive
+r = rear whell drive
+4 = 4wd
+
+$\underline{\text{Problem 4}}$:
+
+```{r}
+ggplot(data = mpg, mapping = (aes(x=cyl, y= hwy))) + 
+  geom_point() + labs(title = "Fuel Efficiency vs Number of Cylinders", x = "Number of Cylinders", y = "Fuel Efficiency")
+```
+
+$\underline{\text{Problem 5}}$:
+
+```{r}
+ggplot(data = mpg, mapping = (aes(x=drv, y= class))) + 
+  geom_point() + labs(title = "Type of Car vs Type of Drive Train", x = "Number of Drive Train", y = "Type of Car")
+```
+
+This is not a useful plot because both class and drv are both categorical variables and we shouldn't expect any kind of relationship between categorical variables to be visible on a scatterplot. 
+
+## Section 3.3:
+
+The cars that have higher mileage than expected may be newer models that have been made with more efficient engines or are hybrids. 
+
+```{r}
+ggplot(data = mpg) + 
+  geom_point(mapping = aes(x = displ, y = hwy, color = class))
+# color the points based on the variable "class"
+```
+Many of the points that fall outside of the linear trend are 2seater cars that are sports cars. 
+
+```{r}
+ggplot(data = mpg) + 
+  geom_point(mapping = aes(x = displ, y = hwy, size = class))
+```
+Note that each size of the point is associated with a class affiliation. 
+
+```{r}
+
+ggplot(data = mpg) + 
+  geom_point(mapping = aes(x = displ, y = hwy, alpha = class))
+# alpha controls transparency of the points
+
+ggplot(data = mpg) + 
+  geom_point(mapping = aes(x = displ, y = hwy, shape = class))
+# Shape control shapes of the points
+```
+Note that ggplot only uses 6 shapes at a time so additional groups will go unplotted, by default. 
+
+```{r}
+ggplot(data = mpg) + 
+  geom_point(mapping = aes(x = displ, y = hwy), color = "blue")
+#changes color of points to blue
+```
+
+Note that setting aesthetic manually goes outside of the aes()
+
+# 3.3.1 Exercises
+
+$\underline{\text{Problem 1}}$: 
+
+```{r}
+ggplot(data = mpg) + 
+  geom_point(mapping = aes(x = displ, y = hwy, color = "blue"))
+```
+
+The points in this graph is not blue because the color aesthetic was not specified properly.
+
+The appropriate code is: 
+
+```{r}
+ggplot(data = mpg) + 
+  geom_point(mapping = aes(x = displ, y = hwy), color = "blue")
+```
+
+$\underline{\text{Problem 2}}$:
+
+When you run mpg, you can tell which variables are categorical when you see that the data type for a particular columns is a character type, as indicated by <chr>.
+
+Categorical variables are: 
+
+* manufacturer
+* model
+* trans
+* drv
+* fl
+* class
+
+Continuous variable are: 
+
+* displ
+
+Integer variables are: 
+
+* year
+* cyl
+* cty
+* hwy
+
+$\underline{\text{Problem 3}}$:
+
+```{r, error=TRUE}
+ggplot(data = mpg) + 
+  geom_point(mapping = aes(x = displ, y = hwy, color = displ))
+
+ggplot(data = mpg) + 
+  geom_point(mapping = aes(x = displ, y = hwy, size = displ))
+
+ggplot(data = mpg) + 
+  geom_point(mapping = aes(x = displ, y = hwy, shape = displ))
+```
+We cannot map a continuous variable to shape. This makes sense since shape would rather have categorical values to map to distinct shapes.
+
+When mapping a continuous variable to color or size, however, we get a gradient of color and sizes. Mapping displ to color is more useful compared to size, since the individual point size is hard to distinguish if a point is within a cluster of other points. 
+
+
+```{r}
+ggplot(data = mpg) + 
+  geom_point(mapping = aes(x = displ, y = hwy, color = drv))
+
+ggplot(data = mpg) + 
+  geom_point(mapping = aes(x = displ, y = hwy, size = drv))
+
+ggplot(data = mpg) + 
+  geom_point(mapping = aes(x = displ, y = hwy, shape = drv))
+```
+If I were to map a categorical variable to color, size, or shape then the code works. This is because we have discrete values mapped to a particular category.
+
+$\underline{\text{Problem 4}}$:
+
+```{r}
+ggplot(data = mpg) + 
+  geom_point(mapping = aes(x = displ, y = hwy, color = displ, size = displ))
+```
+
+When I map the continuous variable displ to color and size, the code works and a plot is generated. It is redundant, however, since having displ mapped to either one tells the same information. 
+
+$\underline{\text{Problem 5}}$:
+
+```{r}
+ggplot(data = mpg, aes(x = displ, y = hwy)) + 
+  geom_point(stroke = 0.5, shape = 21)
+
+ggplot(data = mpg, aes(x = displ, y = hwy)) + 
+  geom_point(stroke = 2, shape = 21)
+```
+The stroke aesthetic modifies the width of the border of the points. 
+
+$\underline{\text{Problem 6}}$:
+
+```{r}
+ggplot(data = mpg, aes(x = displ, y = hwy)) + 
+  geom_point(aes(colour = displ <5))
+
+```
+
+If the aesthetic is mapped to a logical condition, then we have binary data. For example, data that matches the logical condition of having a value less than 5 are "TRUE" and will be colored blue. Otherwise, the data points are colored red. 
+
+## Section 3.4
+
+```{r, error = TRUE}
+
+ggplot(data = mpg) 
++ geom_point(mapping = aes(x = displ, y = hwy))
+
+#this is the wrong position for the "+"
+
+```
+
+
